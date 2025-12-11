@@ -1,0 +1,105 @@
+version: "3.8"
+
+networks:
+  datalake-net:
+    driver: bridge
+
+services:
+  # --- MINIO SERVICES ---
+  minio:
+    image: minio/minio:latest
+    container_name: datalake_minio
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: password123
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - datalake-net
+
+  minio-setup:
+    image: minio/mc:latest
+    container_name: datalake_minio_setup
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 admin password123 &&
+      mc mb -p local/bronze  || true &&
+      mc mb -p local/silver  || true &&
+      mc mb -p local/gold    || true &&
+      mc mb -p local/logs    || true &&
+      echo 'Buckets created (or already exist)';
+      "
+    networks:
+      - datalake-net
+
+  # --- HADOOP SERVICES ---
+  namenode:
+    build:
+      context: ./docker/hadoop
+      dockerfile: Dockerfile.namenode
+    image: custom-hadoop-namenode:3.2.1
+    container_name: hadoop_namenode
+    hostname: namenode
+    environment:
+      - CLUSTER_NAME=datalake-hadoop
+      # Default filesystem is HDFS
+      - CORE_CONF_fs_defaultFS=hdfs://namenode:8020
+      # Configure S3A to talk to MinIO
+      - CORE_CONF_fs_s3a_impl=org.apache.hadoop.fs.s3a.S3AFileSystem
+      - HADOOP_OPTIONAL_TOOLS=hadoop-aws
+      # MinIO connection details
+      - CORE_CONF_fs_s3a_endpoint=http://minio:9000
+      - CORE_CONF_fs_s3a_access_key=admin
+      - CORE_CONF_fs_s3a_secret_key=password123
+      - CORE_CONF_fs_s3a_path_style_access=true
+      - CORE_CONF_fs_s3a_connection_ssl_enabled=false
+    volumes:
+      - namenode_data:/hadoop/dfs/name
+    ports:
+      - "9870:9870" # HDFS Web UI
+      - "9002:8020" # HDFS IPC
+    depends_on:
+      - minio
+    networks:
+      - datalake-net
+
+  datanode:
+    build:
+      context: ./docker/hadoop
+      dockerfile: Dockerfile.datanode
+    image: custom-hadoop-datanode:3.2.1
+    container_name: hadoop_datanode
+    hostname: datanode
+    environment:
+      - CLUSTER_NAME=datalake-hadoop
+      - CORE_CONF_fs_defaultFS=hdfs://namenode:8020
+      - CORE_CONF_fs_s3a_impl=org.apache.hadoop.fs.s3a.S3AFileSystem
+      - HADOOP_OPTIONAL_TOOLS=hadoop-aws
+      - CORE_CONF_fs_s3a_endpoint=http://minio:9000
+      - CORE_CONF_fs_s3a_access_key=admin
+      - CORE_CONF_fs_s3a_secret_key=password123
+      - CORE_CONF_fs_s3a_path_style_access=true
+      - CORE_CONF_fs_s3a_connection_ssl_enabled=false
+    volumes:
+      - datanode_data:/hadoop/dfs/data
+    depends_on:
+      - namenode
+    networks:
+      - datalake-net
+
+volumes:
+  minio_data:
+  namenode_data:
+  datanode_data:
