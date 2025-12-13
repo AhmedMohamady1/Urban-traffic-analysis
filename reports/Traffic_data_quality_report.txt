@@ -1,13 +1,14 @@
 
 # --- Data Quality Report: Traffic Dataset ---
 - Initial Row Count: 5150
-- Final Clean Row Count: 5000
-- Rows Removed (Duplicates/Unfixable): 150
+- Final Clean Row Count: 4733
+- Rows Removed (Duplicates/Unfixable): 417
 
 ## Cleaning Summary:
 - Row Duplicates Removed: 150 occurrences fixed/handled.
-- Unfixable Timestamp Errors: 0 occurrences fixed/handled.
-- Standardized Congestion Categories: 107 occurrences fixed/handled.
-- Imputed Missing avg_speed_kmh by Area: 125 occurrences fixed/handled.
-- Imputed Missing vehicle_count by Area: 107 occurrences fixed/handled.
-- Corrected Negative Speeds: 32 occurrences fixed/handled.
+- Unfixable Timestamp Errors: 267 occurrences fixed/handled.
+- Standardized Congestion Categories: 88 occurrences fixed/handled.
+- Imputed Missing City: 96 occurrences fixed/handled.
+- Imputed Missing avg_speed_kmh by Area: 98 occurrences fixed/handled.
+- Imputed Missing vehicle_count by Area: 96 occurrences fixed/handled.
+- Corrected Negative Speeds: 25 occurrences fixed/handled.

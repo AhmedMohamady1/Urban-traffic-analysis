@@ -1,6 +1,7 @@
 import os
 import boto3
 import io
+import subprocess
 from botocore.client import Config
 from datetime import datetime
 
@@ -65,6 +66,38 @@ class DataLakeManager:
         self.s3.put_object(Bucket=layer, Key=filename, Body=buffer)
         self.log_message("✅ Upload successful.")
 
+    def backup_to_hdfs(self, layer, filename, subfolder=None):
+            """
+            Copy to HDFS. Optional 'subfolder' argument allows organizing
+            by data type (Weather vs Traffic) as required by Phase 3.
+            """
+            s3_source = f"s3a://{layer}/{filename}"
+            
+            # If a subfolder is defined (e.g., 'weather'), put it there. 
+            # Otherwise, keep generic structure /datalake/silver/
+            if subfolder:
+                hdfs_dest_dir = f"/datalake/{subfolder}/"
+            else:
+                hdfs_dest_dir = f"/datalake/{layer}/"
+            
+            self.log_message(f"🔄 Backing up {filename} to HDFS folder: {hdfs_dest_dir}...")
+
+            try:
+                # 1. Ensure the destination directory exists
+                subprocess.run(
+                    ["docker", "exec", "hadoop_namenode", "hdfs", "dfs", "-mkdir", "-p", hdfs_dest_dir],
+                    check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE
+                )
+
+                # 2. Copy the file
+                subprocess.run(
+                    ["docker", "exec", "hadoop_namenode", "hdfs", "dfs", "-cp", "-f", s3_source, hdfs_dest_dir],
+                    check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE
+                )
+                self.log_message("✅ HDFS Backup successful.")
+            except subprocess.CalledProcessError as e:
+                self.log_message(f"❌ HDFS Backup Failed: {e}")
+
     def run_pipeline(self, num_rows=5000):
         self.log_message(" STARTING FULL PIPELINE (Generate -> Bronze -> Silver)...")
 
@@ -75,23 +108,32 @@ class DataLakeManager:
 
         # --- STEP 2: Upload Raw Data to Bronze ---
         self.upload_data(weather_df, 'bronze', 'raw_weather_data.csv')
+        # self.backup_to_hdfs('bronze', 'raw_weather_data.csv') 
+
         self.upload_data(traffic_df, 'bronze', 'raw_traffic_data.csv')
 
         # --- STEP 3: Clean Weather Data and Upload to Silver ---
         self.log_message("2️⃣ Cleaning Weather Data...")
         clean_weather_df = clean_weather_data(weather_df)
         self.upload_data(clean_weather_df, 'silver', 'cleaned_weather_data.parquet')
-
+        
+        # BACKUP TO HDFS
+        self.backup_to_hdfs('silver', 'cleaned_weather_data.parquet', subfolder='weather')
+        
         # --- STEP 4: Clean Traffic Data and Upload to Silver ---
         self.log_message("3️⃣ Cleaning Traffic Data...")
         clean_traffic_df = clean_traffic_data(traffic_df)
         self.upload_data(clean_traffic_df, 'silver', 'cleaned_traffic_data.parquet')
 
+        # BACKUP TO HDFS
+        self.backup_to_hdfs('silver', 'cleaned_traffic_data.parquet', subfolder='traffic')
+        
         # --- STEP 5: Merge Cleaned Weather & Traffic ---
         self.log_message("4️⃣ Merging Cleaned Weather & Traffic Data...")
         merged_df = merge_datasets(clean_weather_df, clean_traffic_df) 
         if merged_df is not None:
             self.upload_data(merged_df, 'silver', 'merged_dataset.parquet')
+            
             self.log_message("✅ Merge complete and uploaded to Silver.")
 
         self.log_message("✅ Silver Layer Ready (Weather + Traffic + Merged).")

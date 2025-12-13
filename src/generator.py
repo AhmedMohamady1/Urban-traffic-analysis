@@ -26,8 +26,10 @@ class WeatherTrafficDataGenerator:
 
     def introduce_mess(self, value, p_null, p_outlier=0, outlier_val=None,
                        p_format=0, format_func=None):
-
-        missing_value = None if isinstance(value, (str, datetime)) else np.nan
+        """Introduces None (for strings/dates) or np.nan (for numbers), outliers, or format errors."""
+        
+        # Use None for missing strings/dates, np.nan for missing numbers
+        missing_value = None if isinstance(value, (str, datetime)) or value is None else np.nan
 
         if random.random() < p_null:
             return missing_value
@@ -69,9 +71,11 @@ class WeatherTrafficDataGenerator:
             pressure = random.uniform(980, 1030)
             condition = random.choice(['Clear', 'Rain', 'Fog', 'Storm', 'Snow'])
 
+            # 1. Date & Time Messiness
+            # In "good file", weather dates are kept CLEAN (messiness commented out).
             dt_mess = dt.strftime('%Y-%m-%d %H:%M:%S')
 
-            # Messiness
+            # 2. Other Column Messiness
             temp_mess = self.introduce_mess(temp, self.P_NULL,
                                             p_outlier=self.P_OUTLIER,
                                             outlier_val=random.choice([-15, 45]))
@@ -102,10 +106,16 @@ class WeatherTrafficDataGenerator:
                 outlier_val=weather_ids[random.randint(0, rows - 1)]
             )
 
+            # Added: Messiness for categorical columns (matched "good file")
+            city_mess = self.introduce_mess(self.CITY, self.P_NULL)
+            season_mess = self.introduce_mess(season, self.P_NULL)
+            condition_mess = self.introduce_mess(condition, self.P_NULL)
+            pressure_mess = self.introduce_mess(pressure, self.P_NULL)
+
             weather_data.append([
-                weather_id_mess, dt_mess, self.CITY, season,
+                weather_id_mess, dt_mess, city_mess, season_mess,
                 temp_mess, humidity_mess, rain_mess, wind_mess,
-                visibility_mess, condition, pressure
+                visibility_mess, condition_mess, pressure_mess
             ])
 
         df = pd.DataFrame(weather_data, columns=[
@@ -144,10 +154,27 @@ class WeatherTrafficDataGenerator:
             road_condition = random.choice(['Dry', 'Wet', 'Snowy', 'Damaged'])
             visibility = random.randint(1000, 10000)
 
-            # use same datetime as weather
-            dt = datetime.strptime(weather_df.loc[i, 'date_time'], "%Y-%m-%d %H:%M:%S")
-            dt_mess = dt.strftime('%Y-%m-%d %H:%M:%S')
+            # 1. Date Synchronization Logic (matched "good file")
+            # 95% chance to use weather timestamp, 5% random
+            if random.random() < 0.95:
+                # Weather df dates are clean strings, so we can parse them
+                dt_str = weather_df.loc[i, 'date_time']
+                dt = datetime.strptime(dt_str, "%Y-%m-%d %H:%M:%S")
+            else:
+                dt = self.random_datetime()
 
+            # 2. Date & Time Messiness (Nulls / Garbage / Formats)
+            dt_base = dt.strftime('%Y-%m-%d %H:%M:%S')
+            if random.random() < self.P_NULL:
+                dt_mess = None
+            elif random.random() < self.P_GARBAGE:
+                dt_mess = random.choice(["INVALID_TIME_STRING", "TBD_TRAFFIC"])
+            elif random.random() < self.P_FORMAT:
+                dt_mess = dt.strftime('%d/%m/%Y %I%p')
+            else:
+                dt_mess = dt_base
+
+            # 3. Other Column Messiness
             vehicle_count_mess = self.introduce_mess(vehicle_count, self.P_NULL,
                                                      p_outlier=self.P_OUTLIER,
                                                      outlier_val=5000)
@@ -166,7 +193,11 @@ class WeatherTrafficDataGenerator:
                 format_func=lambda c: random.choice(['NON_STANDARD', '4'])
             )
 
+            # Added: Messiness for categorical columns (matched "good file")
+            city_mess = self.introduce_mess(self.CITY, self.P_NULL)
+            area_mess = self.introduce_mess(area, self.P_NULL)
             road_mess = self.introduce_mess(road_condition, self.P_NULL)
+            
             visibility_mess = self.introduce_mess(visibility, self.P_NULL,
                                                   p_outlier=self.P_OUTLIER,
                                                   outlier_val=20000)
@@ -178,7 +209,7 @@ class WeatherTrafficDataGenerator:
             )
 
             traffic_data.append([
-                traffic_id_mess, dt_mess, self.CITY, area, vehicle_count_mess,
+                traffic_id_mess, dt_mess, city_mess, area_mess, vehicle_count_mess,
                 avg_speed_mess, accident_count_mess, congestion_mess,
                 road_mess, visibility_mess
             ])

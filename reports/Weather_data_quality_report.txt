@@ -7,10 +7,13 @@
 ## Cleaning Summary:
 - Row Duplicates Removed: 150 occurrences fixed/handled.
 - Unfixable Timestamp Errors: 0 occurrences fixed/handled.
-- Imputed temperature_c by Season: 104 occurrences fixed/handled.
-- Imputed humidity by Season: 93 occurrences fixed/handled.
-- Imputed air_pressure_hpa by Season: 0 occurrences fixed/handled.
-- Corrected Temp Outliers: 45 occurrences fixed/handled.
-- Corrected Humidity Outliers: 47 occurrences fixed/handled.
+- Imputed Missing City/Condition: 218 occurrences fixed/handled.
+- Imputed Missing Season: 95 occurrences fixed/handled.
+- Fixed Non-Numeric Visibility: 0 occurrences fixed/handled.
+- Imputed temperature_c by Season: 105 occurrences fixed/handled.
+- Imputed humidity by Season: 96 occurrences fixed/handled.
+- Imputed air_pressure_hpa by Season: 97 occurrences fixed/handled.
+- Corrected Temp Outliers: 47 occurrences fixed/handled.
+- Corrected Humidity Outliers: 62 occurrences fixed/handled.
 - Corrected Rain Outliers: 0 occurrences fixed/handled.
 - Corrected Wind Outliers: 0 occurrences fixed/handled.
